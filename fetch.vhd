@@ -20,7 +20,7 @@ port (
 		
 	--output data
 		instruction_out out : instruction;
-		program_counter_out out : address;
+		program_counter_out out : address
 
 
 	);
@@ -68,6 +68,6 @@ next_pc_proc : process (branch_ctrl, stall_ctrl, flush_ctrl, mem_ready, rst)
 					else
 						next_pc <= std_logic_vector(unsigned(pc) + 4);	
 					end if;
-
+end process;
 
 end architecture;
