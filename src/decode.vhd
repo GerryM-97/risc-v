@@ -3,91 +3,145 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use WORK.generics.all;
 
-entity decode is
-port(	--control signals
-		clk, rst : in std_logic;
-		wr_en : in std_logic;
-		pc_out_ctrl : in std_logic;
-		--input
-		instruction_f : in instruction_format;
-		instruction_in : in instruction;
-		pc_in : in address;
-		wr_add : in register_address;
-		wr_data : in data;
-
-		--output
-		data_p1, data_p2, immediate_out : out data;
-		rs1, rs2, rd : out register_address;
-		branch_address : out address;
-		branch : out std_logic
-		);
-end entity;
-
-architecture struct of decode is
-
-component reg is
-generic (nbit_reg : integer := nbit;
-			rst_val : std_logic_vector(nbit-1 downto 0));
-port (	
-		clk, rst, enable : in std_logic;
-		data_in : in std_logic_vector(nbit_reg -1 downto 0);
-		data_out : out std_logic_vector(nbit_reg-1 downto 0)
-		);
-end component;
-
-component immediate_gen is
-port(
-		--instruction type
-		instruction_t : in instruction_format;
-
-		--input
-		instruction : in instruction;
-
-		--output
-		immediate_out : out data
-);
-end component;
-
-component reg_file is
-port ( 
+ENTITY decode IS
+PORT (	
 		--control signals
-		clk, rst : in std_logic;
-		wr_en : in std_logic;
+		CLK, RST 			: in std_logic;
+		STALL_CTRL 			: in std_logic;
+		WR_EN 				: in std_logic;
+		PC_OUT_CTRL 		: in std_logic;
+		BRANCH_FORW_CTRL	: in std_logic_vector(1 downto 0);
+
+		--input
+		INSTRUCTION_F_ID 		: in instruction_format;
+		OPERATION_ID			: in operation;
+		INSTRUCTION_ID 			: in instruction;
+		PC_ID 					: in address;
+		WR_ADD 					: in register_address;
+		WR_DATA 				: in data;
+		BRANCH_FORW_MEM 		: in data;
+
+		--output
+		DATA1_EX, DATA2_EX, IMMEDIATE_EX 	: out data;
+		RS1_EX, RS2_EX, RD_EX 				: out register_address;
+		BRANCH_ADD_ID 						: out address;
+		BRANCH_ID 							: out std_logic
+);
+END ENTITY;
+
+ARCHITECTURE struct OF decode IS 
+
+COMPONENT immediate_gen IS
+PORT(
+		--instruction type
+		INSTRUCTION_F_IN : in instruction_format;
+
+		--input
+		INSTRUCTION_IN 	 : in instruction;
+
+		--output
+		IMMEDIATE_OUT 	 : out data
+);
+END COMPONENT;
+
+COMPONENT reg_file IS
+PORT ( 
+		--control signals
+		CLK, RST 	: in std_logic;
+		WR_EN 		: in std_logic;
 
 		--inputs
-		address_rd1, address_rd2, address_wr : in register_address;
-		wr_data : in data;
+		ADDRESS_RD1, ADDRESS_RD2, ADDRESS_WR : in register_address;
+		WR_DATA								 : in data;
 
 		--outputs
-		data_p1, data_p2 : out data
+		DATA_P1, DATA_P2 : out data
 
 );
-end component;
+END COMPONENT;
 
-signal regf_p1, regf_p2, immediate : data;
-signal data_to_exe1 : address;
+SIGNAL IMMEDIATE_ID 			: data;
+SIGNAL RS1_ID, RS2_ID, RD_ID 	: register_address;
+SIGNAL REGF_P1, REGF_P2 		: data;
 
-begin
+BEGIN
 
-data_to_exe1 <= pc_in when pc_out_ctrl = '1' else
-				regf_p1;
+RS1_ID <= INSTRUCTION_ID(19 DOWNTO 15);
+RS2_ID <= INSTRUCTION_ID(24 DOWNTO 20);
+RD_ID  <= INSTRUCTION_ID(11 DOWNTO 7);
 
-branch <= '1' when regf_p1 = regf_p2 and instruction_f = B_type else
-			'0';
+imm_gen_inst 	: immediate_gen PORT MAP (INSTRUCTION_F_ID, INSTRUCTION_ID, IMMEDIATE_ID);
 
-branch_address <= std_logic_vector(unsigned(immediate) + unsigned(pc_in)) when instruction_f = B_type or instruction_f = J_type else
-				  (others => '0');
+reg_file_inst 	:  reg_file PORT MAP(CLK => CLK,
+									 RST => RST,
+									 WR_EN => WR_EN,
+									 ADDRESS_RD1 => RS1_ID,
+									 ADDRESS_RD2 => RS2_ID,
+									 ADDRESS_WR => WR_ADD,
+									 WR_DATA => WR_DATA,
+									 DATA_P1 => REGF_P1,
+									 DATA_P2 => REGF_P2);
 
-imm_gen_inst : immediate_gen port map(instruction_f, instruction_in, immediate);
+out_proc : PROCESS(CLK, RST)
+BEGIN
+		IF RST = '1' THEN
+			DATA1_EX 		<= (OTHERS => '0');
+			DATA2_EX 		<= (OTHERS => '0');
+			IMMEDIATE_EX 	<= (OTHERS => '0');
 
-reg_file_inst : reg_file port map(clk, rst, wr_en, instruction_in(19 downto 15), instruction_in(24 downto 20), wr_add, wr_data, regf_p1, regf_p2);
+			RS1_EX 			<= (OTHERS => '0');
+			RS2_EX 			<= (OTHERS => '0');
+			RD_EX			<= (OTHERS => '0');
+		ELSIF RISING_EDGE(CLK) THEN
+			IF PC_OUT_CTRL = '1' THEN
+				DATA1_EX 		<= PC_ID; 
+			ELSE
+				DATA1_EX 		<= REGF_P1;
+			END IF;
+			DATA2_EX 		<= REGF_P2;
+			IMMEDIATE_EX 	<= IMMEDIATE_ID;
 
-out_reg1 : reg generic map(nbit, (others => '0') ) port map(clk, rst, '1', data_to_exe1, data_p1);
-out_reg2 : reg generic map(nbit, (others => '0') ) port map(clk, rst, '1', regf_p2, data_p2);
-out_imm :  reg generic map(nbit, (others => '0') ) port map(clk, rst, '1', immediate, immediate_out);
+			RS1_EX 			<= RS1_ID;
+			RS2_EX 			<= RS2_ID;
+			RD_EX			<= RD_ID;
+		END IF;
+END PROCESS;
 
-out_rs1 : reg generic map(5, (others => '0') ) port map(clk, rst, '1', instruction_in(19 downto 15), rs1);
-out_rs2 : reg generic map(5, (others => '0') ) port map(clk, rst, '1', instruction_in(24 downto 20), rs2);
-out_rd : reg generic map(5, (others => '0') ) port map(clk, rst, '1', instruction_in(11 downto 7), rd);
+branch_proc : PROCESS(RST, OPERATION_ID, BRANCH_FORW_CTRL, BRANCH_FORW_MEM, REGF_P1, REGF_P2, STALL_CTRL, PC_ID, IMMEDIATE_ID) ---------------------------------
+BEGIN
+		IF RST = '1' THEN
+			BRANCH_ID <= '0';
+			BRANCH_ADD_ID <= (OTHERS => '0');
+		ELSIF OPERATION_ID = JAL THEN
+			BRANCH_ID <= '1';
+			BRANCH_ADD_ID <= STD_LOGIC_VECTOR(UNSIGNED(PC_ID) + UNSIGNED(IMMEDIATE_ID));
+		ELSIF OPERATION_ID = BEQ and STALL_CTRL = '0' THEN
+			IF BRANCH_FORW_CTRL = "11" THEN
+				IF REGF_P1 = BRANCH_FORW_MEM THEN
+					BRANCH_ID <= '1';
+					BRANCH_ADD_ID <= STD_LOGIC_VECTOR(UNSIGNED(PC_ID) + UNSIGNED(IMMEDIATE_ID));
+				ELSE
+					BRANCH_ID <= '0';
+				END IF;
+			ELSIF BRANCH_FORW_CTRL = "10" THEN
+				IF BRANCH_FORW_MEM = REGF_P2 THEN
+					BRANCH_ID <= '1';
+					BRANCH_ADD_ID <= STD_LOGIC_VECTOR(UNSIGNED(PC_ID) + UNSIGNED(IMMEDIATE_ID));
+				ELSE
+					BRANCH_ID <= '0';
+				END IF;
+			ELSE
+				IF REGF_P1 = REGF_P2 THEN	
+					BRANCH_ID <= '1';
+					BRANCH_ADD_ID <= STD_LOGIC_VECTOR(UNSIGNED(PC_ID) + UNSIGNED(IMMEDIATE_ID));
+				ELSE
+					BRANCH_ID <= '0';
+				END IF;
+			END IF;
+		ELSE
+			BRANCH_ID <= '0';
+		END IF;
+END PROCESS;
 
-end architecture;
+
+END ARCHITECTURE;

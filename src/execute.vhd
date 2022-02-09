@@ -3,73 +3,70 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use WORK.generics.all;
 
-entity execute is
-port(	--control signals
-		clk, rst : 						in std_logic;
-		instruction_f : 				in instruction_format;
-		op_in : 						in operation;
-		mux_sel_op1, mux_sel_op2 :  	in std_logic_vector(1 downto 0);
-
-		--inputs
-		data_p1, data_p2, immediate : 	in data;
-		data_forw_mem : 				in data;
-		data_forw_wrb : 				in data;
-		rd_in 		  : 				in register_address;
-
-		--outputs
-		--zero : 							out std_logic;	
-		mem_data : 						out data;
-		mem_address : 					out address;
-		rd : 							out register_address
-
-		);
-end entity;
-
-architecture struct of execute is
-
-component ALU is
-port (	
+ENTITY execute IS
+PORT (
 		--control signals
-		alu_func : in operation;
+		CLK, RST 			: in std_logic;
+		OPERATION_EX 		: in operation;
+		MUX_SEL_OP1 		: in std_logic_vector(1 DOWNTO 0);
+		MUX_SEL_OP2 		: in std_logic_vector(1 DOWNTO 0);
+
+		--input
+		DATA1_EX, DATA2_EX 	: in data;
+		IMMEDIATE_EX		: in data;
+		DATA_FORW_MEM		: in data;
+		DATA_FORW_WRB		: in data;
+		RD_EX				: in register_address;
+
+		--output
+		ADDRESS_MEM			: out address;
+		DATA_MEM			: out data;
+		RD_MEM				: out register_address
+);
+END ENTITY;
+
+ARCHITECTURE behav OF execute IS
+
+COMPONENT ALU IS
+PORT (	
+		--control signals
+		ALU_OPERATION 			: in operation;
 
 		--inputs
-		operand_1, operand_2 : in data;
+		OPERAND_1, OPERAND_2 	: in data;
 		
 		--outputs
-		data_out : out data
-		--zero : out std_logic
+		DATA_OUT 				: out data
 		
 		);
-end component;
+END COMPONENT;
 
-component reg is
-generic (nbit_reg : integer := nbit;
-			rst_val : std_logic_vector(nbit-1 downto 0));
-port (	
-		clk, rst, enable : in std_logic;
-		data_in : in std_logic_vector(nbit_reg -1 downto 0);
-		data_out : out std_logic_vector(nbit_reg-1 downto 0)
-		);
-end component;
+SIGNAL ALU_OP1, ALU_OP2, ALU_OUT : data;
 
-signal alu_op1, alu_op2,alu_out : data;
+BEGIN
 
-begin
+alu_op1_mux : ALU_OP1 <= DATA_FORW_MEM WHEN MUX_SEL_OP1 = "10" ELSE		
+						 DATA_FORW_WRB WHEN MUX_SEL_OP1 = "11" ELSE
+						 DATA1_EX;
 
-alu_op1 <=	data_forw_mem when mux_sel_op1 = "10" else		
-			data_forw_wrb  when mux_sel_op1 = "11" else
-			data_p1;
+alu_op2_mux : ALU_OP2 <= DATA2_EX 	   WHEN MUX_SEL_OP2 = "00" ELSE
+						 IMMEDIATE_EX  WHEN MUX_SEL_OP2 = "01" ELSE	 
+						 DATA_FORW_MEM WHEN MUX_SEL_OP2 = "10" ELSE		
+						 DATA_FORW_WRB WHEN MUX_SEL_OP2 = "11";
 
-alu_op2 <=  data_forw_mem when mux_sel_op2 = "10" else
-			data_forw_wrb when mux_sel_op2 = "11" else
-			data_p2 	  when mux_sel_op2 = "00" else
-			immediate	  when mux_sel_op2 = "01" else
-			(others => '0');
+alu_inst  : ALU PORT MAP(OPERATION_EX, ALU_OP1, ALU_OP2, ALU_OUT);
 
-alu_inst : ALU port map(op_in, alu_op1, alu_op2, alu_out);
+out_proc : PROCESS (CLK, RST)
+BEGIN
+		IF RST = '1' THEN
+			ADDRESS_MEM <= (OTHERS => '0');
+			DATA_MEM 	<= (OTHERS => '0');
+			RD_MEM 		<= (OTHERS => '0');
+		ELSIF RISING_EDGE(CLK) THEN
+			ADDRESS_MEM <= ALU_OUT;
+			DATA_MEM 	<= ALU_OP2;
+			RD_MEM 		<= RD_EX;
+		END IF;
+END PROCESS;
 
-mem_data_out : reg generic map(nbit, (others => '0')) port map(clk, rst, '1', alu_out, mem_address);
-mem_add_out  : reg generic map(nbit, (others => '0')) port map(clk, rst, '1', alu_op2, mem_data);
-rd_out		 : reg generic map(5,  	 (others => '0')) port map(clk, rst, '1', rd_in, rd);
-
-end architecture;
+END ARCHITECTURE;

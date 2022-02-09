@@ -42,7 +42,6 @@ data_rd : process (rst, address_rd1, address_rd2, address_wr, wr_en) --process f
 						data_p1 <= register_file(to_integer(unsigned(address_rd1))); -- no if-then because at rst the reg file is written with all 0s
 						data_p2 <= register_file(to_integer(unsigned(address_rd2)));
 					end if;
-					
 				end if;
 
 end process;

@@ -3,56 +3,54 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use WORK.generics.all;
 
-entity memory is
-port ( --control signals
-		clk, rst : in std_logic;
-		mem_en_in : in std_logic;	
-		mem_rd_nwr_in : in std_logic;
+ENTITY memory IS
+PORT(
+		--control signals
+		CLK, RST 		: in std_logic;
+		DRAM_EN_IN 		: in std_logic;	
+		DRAM_RD_NWR_IN 	: in std_logic;
 		
-		mem_en_out : out std_logic;
-		mem_rd_nwr_out : out std_logic;
+		DRAM_EN_OUT 	: out std_logic;
+		DRAM_RD_NWR_OUT : out std_logic;
 
 		--inputs 
-		mem_add : in address;
-		mem_data : in data;
-		data_from_mem : in data;
-		rd_in : in register_address;
+		ADDRESS_MEM 	: in address;
+		DATA_MEM 		: in data;
+		DRAM_DATA 		: in data;
+		RD_MEM 			: in register_address;
 
 		--outputs
-		add_to_mem : out address;
-		data_to_mem : out data;
-		data_mem_out : out data;
-		data_bypass : out data;
-		rd_out : out register_address
+		DRAM_ADD 		: out address;
+		DRAM_WR_DATA 	: out data;
+		DATA_WRB	 	: out data;
+		DATA_BYPASS_WRB : out data;
+		RD_WRB 			: out register_address
+);
+END ENTITY;
 
-		);
-end entity;
+ARCHITECTURE struct OF memory IS
 
-architecture struct of memory is
+BEGIN
 
-component reg is
-generic (nbit_reg : integer := nbit;
-			rst_val : std_logic_vector(nbit-1 downto 0));
-port (	
-		clk, rst, enable : in std_logic;
-		data_in : in std_logic_vector(nbit_reg -1 downto 0);
-		data_out : out std_logic_vector(nbit_reg-1 downto 0)
-		);
-end component;
+DRAM_ADD 		<= ADDRESS_MEM;
+DRAM_WR_DATA 	<= DATA_MEM;
 
-begin
+DRAM_RD_NWR_OUT <= DRAM_RD_NWR_IN;
+DRAM_EN_OUT 	<= DRAM_EN_IN;
 
-add_to_mem <= mem_add;
-data_to_mem <= mem_data;
+out_proc : PROCESS(RST, CLK)
+BEGIN
+		IF RST = '1' THEN
+			DATA_WRB 			<= (OTHERS => '0');
+			DATA_BYPASS_WRB 	<= (OTHERS => '0');
+			RD_WRB 				<= (OTHERS => '0');
+		ELSIF  RISING_EDGE(CLK) THEN
+			IF DRAM_EN_IN = '1' THEN
+				DATA_WRB 			<= DRAM_DATA;
+			END IF;
+			DATA_BYPASS_WRB 	<= ADDRESS_MEM;
+			RD_WRB 				<= RD_MEM;
+		END IF;
+END PROCESS;
 
-mem_rd_nwr_out <= mem_rd_nwr_in;
-mem_en_out <= mem_en_in;
-
-mem_data_reg : 		reg generic map(nbit, (others => '0')) port map(clk, rst, '1', data_from_mem, data_mem_out);
-
-mem_bypass_reg :	reg generic map(nbit, (others => '0')) port map(clk, rst, '1', mem_add, data_bypass);
-
-rd_reg : 			reg generic map(5, (others => '0')) port map(clk, rst, '1', rd_in, rd_out);
-
-
-end architecture;
+END ARCHITECTURE;

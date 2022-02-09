@@ -3,59 +3,59 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use WORK.generics.all;
 
-entity ALU is 
-port (	
+ENTITY ALU IS 
+PORT (	
 		--control signals
-		alu_func : in operation;
+		ALU_OPERATION 			: in operation;
 
 		--inputs
-		operand_1, operand_2 : in data;
+		OPERAND_1, OPERAND_2 	: in data;
 		
 		--outputs
-		data_out : out data
-		--zero : out std_logic
+		DATA_OUT 				: out data
 		
 		);
-end entity;
+END ENTITY;
 
-architecture behav of ALU is
+ARCHITECTURE behav OF ALU IS
 
-signal shifted : data;
-signal zero : std_logic;
+SIGNAL SHIFTED : data;
+SIGNAL ZERO : std_logic;
+SIGNAL SHIFT_VAL : integer;
 
-begin
+BEGIN
 
---zero for comparison
---zero <= '1' when signed(operand_1) < signed(operand_2) else '0';
-zero <= '1' when (operand_1) < (operand_2) else '0';
-
-
-data_out <= std_logic_vector(signed(operand_1) + signed(operand_2)) when alu_func = ADD else
-			std_logic_vector(signed(operand_1) + signed(operand_2)) when alu_func = ADDI else
-			std_logic_vector(signed(operand_1) + signed(operand_2)) when alu_func = AUIPC else 
-			operand_2 												when alu_func = LUI else
-			std_logic_vector(signed(operand_1) + signed(operand_2)) when alu_func = BEQ else
-			std_logic_vector(signed(operand_1) + signed(operand_2)) when alu_func = LW else
-			shifted 												when alu_func = SRAI else
-			operand_1 and operand_2 								when alu_func = ANDI else	
-			operand_1 xor operand_2 								when alu_func = XOR_T else	
-			(nbit-1 downto 1 => '0') & zero 						when alu_func = SLT else
-			std_logic_vector(signed(operand_1) + 4) 				when alu_func = JAL else
-			std_logic_vector(signed(operand_1) + signed(operand_2)) when alu_func = SW else
-			(others => '0');
+SHIFT_VAL <= to_integer(unsigned(OPERAND_2(4 DOWNTO 0)));
+ZERO <= '1' WHEN (OPERAND_1) < (OPERAND_2) ELSE '0';
 
 
-shift_proc : process ( alu_func, operand_1, operand_2) --process for shifting arith right
-				variable  shift_out : data; 
-				begin
-					if (alu_func = SRAI) then
-						shift_out := operand_1;
-						for i in 0 to to_integer(unsigned(operand_2(4 downto 0))) loop
-							shift_out := shift_out(nbit-1) & shift_out(nbit-1 downto 1);
-						end loop;
-					end if;
-shifted <= shift_out;
-			
-end process;
+DATA_OUT <= std_logic_vector(signed(OPERAND_1) + signed(OPERAND_2)) WHEN ALU_OPERATION = ADD   ELSE
+			std_logic_vector(signed(OPERAND_1) + signed(OPERAND_2)) WHEN ALU_OPERATION = ADDI  ELSE
+			std_logic_vector(signed(OPERAND_1) + signed(OPERAND_2)) WHEN ALU_OPERATION = AUIPC ELSE 
+			OPERAND_2 												WHEN ALU_OPERATION = LUI   ELSE
+			std_logic_vector(signed(OPERAND_1) + signed(OPERAND_2)) WHEN ALU_OPERATION = BEQ   ELSE
+			std_logic_vector(signed(OPERAND_1) + signed(OPERAND_2)) WHEN ALU_OPERATION = LW    ELSE
+			SHIFTED 												WHEN ALU_OPERATION = SRAI  ELSE
+			OPERAND_1 AND OPERAND_2 								WHEN ALU_OPERATION = ANDI  ELSE	
+			OPERAND_1 XOR OPERAND_2 								WHEN ALU_OPERATION = XOR_T ELSE	
+			(nbit-1 DOWNTO 1 => '0') & ZERO 						WHEN ALU_OPERATION = SLT   ELSE
+			std_logic_vector(signed(OPERAND_1) + 4) 				WHEN ALU_OPERATION = JAL   ELSE
+			std_logic_vector(signed(OPERAND_1) + signed(OPERAND_2)) WHEN ALU_OPERATION = SW    ELSE
+			(OTHERS => '0');
 
-end architecture;
+shift_proc : PROCESS ( ALU_OPERATION, OPERAND_1, OPERAND_2) --process for shifting arith right
+				VARIABLE  SHIFT_OUT : data;
+				--VARIABLE  SHIFT_VAL : integer ;
+				BEGIN
+					--SHIFT_VAL := to_integer(unsigned(OPERAND_2(4 DOWNTO 0)));
+					IF (ALU_OPERATION = SRAI) THEN
+						SHIFT_OUT := OPERAND_1;
+						FOR i IN 0 TO nbit-1 LOOP
+							EXIT WHEN i = SHIFT_VAL;
+							SHIFT_OUT := SHIFT_OUT(nbit-1) & SHIFT_OUT(nbit-1 DOWNTO 1);
+						END LOOP;
+					END IF;
+SHIFTED <= SHIFT_OUT;
+END PROCESS;
+
+END ARCHITECTURE;

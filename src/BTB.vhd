@@ -3,104 +3,103 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use WORK.generics.all;
 
-entity BTB is
-port (
-		clk, rst : in std_logic;
-		update_en : in std_logic;
+ENTITY BTB IS
+PORT (
+		--control signals
+		CLK, RST : in std_logic;
+		STALL_CTRL : in std_logic;
+		UPDATE_EN  : in std_logic;
 
-		pc_if : in address;
-		pc_id : in address; --branch from decode
-
-		predict_t_nt, predict_t_t, predict_nt_t, predict_nt_nt : in std_logic;
-
-		branch_target : out address;
-		match : out std_logic;
-		prediction : out std_logic_vector(1 downto 0)
+		--inputs
+		PC_IF : in address;
+		PC_ID : in address;
+		BRANCH_OUTCOME : in address;
+		PRED_T_T, PRED_T_NT, PRED_NT_T, PRED_NT_NT : in std_logic;
+		
+		--outputs
+		MATCH : out std_logic;
+		BRANCH_TARGET : out address;
+		PREDICTION : out std_logic_vector(1 DOWNTO 0)
 );
-end entity;
+END ENTITY;
 
-architecture behav of BTB is
+ARCHITECTURE struct OF BTB IS
 
-type BHT_arr is array (0 to 31) of address;
-type target_add_arr is array (0 to 31) of address;
-type predictor_arr is array (0 to 31) of std_logic_vector(1 downto 0);
+TYPE BHT_ARR IS ARRAY (0 TO 31) OF address;
+TYPE TARGET_ADD_ARR IS ARRAY (0 TO 31) of address;
+TYPE PREDICTOR_ARR is array (0 TO 31) of std_logic_vector(1 DOWNTO 0);
 
-signal BHT : BHT_arr;
-signal target_add : target_add_arr;
-signal predictor : predictor_arr;
-signal entry, old_entry : integer := 0;
+SIGNAL BHT : BHT_arr;
+SIGNAL TARGET_ADD : target_add_arr;
+SIGNAL PREDICTOR : predictor_arr;
 
-signal old_pc : address;
+SIGNAL ENTRY_IF, ENTRY_ID : integer := 0;
 
-begin
+BEGIN
 
-entry <= to_integer(unsigned(pc_if(6 downto 2))) when rst = '0' else
-		 0;
+ENTRY_IF <= TO_INTEGER(UNSIGNED(PC_IF(6 DOWNTO 2))) WHEN RST = '0' ELSE 0;
+ENTRY_ID <= TO_INTEGER(UNSIGNED(PC_ID(6 DOWNTO 2))) WHEN RST = '0' ELSE 0;
 
+rd_proc : PROCESS(RST, PC_IF, ENTRY_IF, PREDICTOR, TARGET_ADD, BHT)
+BEGIN
+		IF RST = '1' THEN
+			MATCH <= '0';
+			BRANCH_TARGET <= (OTHERS => '0');
+			PREDICTION <= (OTHERS => '0');
+		ELSIF PC_IF = BHT(ENTRY_IF) THEN
+			MATCH <= '1';
+			BRANCH_TARGET <= TARGET_ADD(ENTRY_IF);
+			PREDICTION <= PREDICTOR(ENTRY_IF);
+		ELSE
+			MATCH <= '0';
+			BRANCH_TARGET <= TARGET_ADD(ENTRY_IF);
+			PREDICTION <= PREDICTOR(ENTRY_IF);
+		END IF;
+END PROCESS;
 
-rd_proc : process(pc_if, rst)
-begin
-		if rst = '1' then
-			branch_target <= (others => '0');
-			match <= '0'; 
-			prediction <= (others => '0');
-		else
-			branch_target <= target_add(entry);
-			prediction <= predictor(entry);
-			if pc_if = BHT(entry) then
-				match <= '1';
-			else
-				match <= '0';
-			end if;
-		end if;
-end process;
+update_proc : PROCESS(RST, CLK)
+BEGIN
+		IF RST = '1' THEN
+			BHT <= (OTHERS => (OTHERS => '0'));
+			TARGET_ADD <= (OTHERS => (OTHERS => '0'));
+			--PREDICTOR <= (OTHERS => (OTHERS => '0'));
+		ELSIF RISING_EDGE(CLK) THEN
+			IF STALL_CTRL = '0' THEN
+				IF UPDATE_EN = '1' THEN
+					BHT(ENTRY_ID) <= PC_ID;
+					TARGET_ADD(ENTRY_ID) <= BRANCH_OUTCOME;
+				END IF;
+			END IF;
+		END IF;
+END PROCESS;
 
-wr_proc : process (clk, rst) 
-begin
-		if rst = '1' then
-			BHT <= (others => (others => '0'));
-			target_add <= (others => (others => '0'));
-			old_pc <= (others => '0');
-		elsif rising_edge(clk) then
-			old_pc <= pc_if; --potrebbe non funzionare 
-			old_entry <= entry;
-			if update_en = '1' then
-				BHT(old_entry) <= old_pc;
-				target_add(old_entry) <= pc_id;
-			end if;
-			
-		end if;
-end process;
-
-predict_proc_wr : process(clk, rst) 
-	begin
-		if rst = '1' then
-			predictor <= (others => (others => '0'));
-		elsif rising_edge(clk) then
-			--if update_en = '1' then
-				if predict_t_t = '1' then --predicted taken and taken so if was "11" no update, if was "10" update to "11"
-					if predictor(entry) = "10" then
-						predictor(entry) <= "11";
-					end if;
-				elsif predict_t_nt = '1' then --predicted taken and not taken, so if was "11" update to "10", if was "10" update to "00"
-					if predictor(entry) = "11" then
-						predictor(entry) <= "10";
-					else
-						predictor(entry) <= "00";
-					end if;
-				elsif predict_nt_t = '1' then		
-					if predictor(entry) = "00" then
-						predictor(entry) <= "01";
-					else
-						predictor(entry) <= "11";
-					end if;
-				elsif predict_nt_nt = '1' then
-					if predictor(entry) = "01" then
-						predictor(entry) <= "00";
-					end if;
-				end if;
-			--end if;
-		end if;
-end process;
-
-end architecture;
+pred_proc : PROCESS(RST, CLK)
+BEGIN
+		IF RST = '1' THEN
+			PREDICTOR <= (OTHERS => (OTHERS => '0'));
+		ELSIF RISING_EDGE(CLK) THEN
+			IF PRED_T_T = '1' THEN
+				IF PREDICTOR(ENTRY_ID) = "10" THEN
+					PREDICTOR(ENTRY_ID) <= "11";
+				END IF;
+			ELSIF PRED_T_NT = '1' THEN
+				IF PREDICTOR(ENTRY_ID) = "11" THEN
+					PREDICTOR(ENTRY_ID) <= "10";
+				ELSE
+					PREDICTOR(ENTRY_ID) <= "00";
+				END IF;
+			ELSIF PRED_NT_T = '1' THEN
+				IF PREDICTOR(ENTRY_ID) = "00" THEN
+					PREDICTOR(ENTRY_ID) <= "01";
+				ELSE
+					PREDICTOR(ENTRY_ID) <= "11";
+				END IF;
+			ELSIF PRED_NT_NT = '1' THEN
+				IF PREDICTOR(ENTRY_ID) = "01" THEN
+					PREDICTOR(ENTRY_ID) <= "00";
+				END IF;
+			END IF;
+		END IF;
+END PROCESS;
+ 
+END ARCHITECTURE;

@@ -3,38 +3,38 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use WORK.generics.all;
 
-entity hazard_unit is
-port (	--inputs
-		clk, rst : in std_logic;
-		rs1, rs2, exe_rd : in register_address;
-		exe_wr : in std_logic;
+ENTITY hazard_unit IS
+PORT (
+		--inputs
+		CLK, RST : in std_logic;
+		RS1_ID, RS2_ID, RD_EX : in register_address;
+		WR_EX : in std_logic;
 
 		--outputs
-		stall_ctrl : out std_logic
-
+		STALL_CTRL : out std_logic
 );
-end entity;
+END ENTITY;
 
-architecture struct of hazard_unit is
+ARCHITECTURE behav OF hazard_unit IS
+BEGIN
 
-begin
+stall_proc : PROCESS(RST, WR_EX, RD_EX, RS1_ID, RS2_ID)
+BEGIN
+		IF RST = '1' THEN
+			STALL_CTRL <= '0';
+		ELSIF WR_EX = '1' THEN
+			IF RD_EX /= (reg_len-1 DOWNTO 0 => '0') THEN
+				IF RD_EX = RS1_ID OR RD_EX = RS2_ID THEN
+					STALL_CTRL <= '1';
+				ELSE
+					STALL_CTRL <= '0';
+				END IF;
+			ELSE
+				STALL_CTRL <= '0';
+			END IF;
+		ELSE
+			STALL_CTRL <= '0';
+		END IF;
+END PROCESS;
 
-stall_ctrl <= '0' when rst = '1' else
-			  '1' when exe_wr = '1' and (exe_rd = rs1 or exe_rd = rs2) and exe_rd /= (reg_len-1 downto 0 => '0') else
-			  '0';
-
---stall_proc : process(clk, rst)
---begin
---		if rst = '1' then
---			stall_ctrl <= '0';
---		elsif rising_edge(clk) then
---			if exe_wr = '1' and (exe_rd = rs1 or exe_rd = rs2) and exe_rd /= (reg_len-1 downto 0 => '0') then
---				stall_ctrl <= '1';
---			else
---				stall_ctrl <= '0';
---			end if;
-		
---		end if;
---end process;
-
-end architecture;
+END ARCHITECTURE;
