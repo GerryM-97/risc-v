@@ -190,7 +190,21 @@ PORT(
 END COMPONENT;
 	
 COMPONENT BTB IS
-PORT(	
+PORT (
+		--control signals
+		CLK, RST : in std_logic;
+		STALL_CTRL : in std_logic;
+		UPDATE_EN  : in std_logic;
+
+		--inputs
+		PC_IF : in address;
+		PC_ID : in address;
+		BRANCH_OUTCOME : in address;
+		PRED_T_T, PRED_T_NT, PRED_NT_T, PRED_NT_NT : in std_logic;
+		
+		--outputs
+		PREDICTION : out std_logic;
+		BRANCH_TARGET : out address
 );
 END COMPONENT;
 
