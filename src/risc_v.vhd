@@ -215,14 +215,18 @@ PORT(
 		STALL_CTRL : in std_logic;
 		BRANCH_TAKEN : in std_logic;
 		OPERATION_ID : in operation;
+	
+		PREDICTION : IN STD_LOGIC;
+	
+		UPDATE_EN : OUT std_logic;
+		PRED_T_T, PRED_T_NT, PRED_NT_T, PRED_NT_NT : OUT std_logic;
 
 		--inputs
 		PC_IF, PC_ID : in address;
 		BRANCH_OUTCOME : in address;
 		--outputs
 		FLUSH_CTRL : out std_logic;
-		BRANCH_CTRL : out std_logic;
-		BRANCH_TARGET : out address
+		BRANCH_CTRL : out std_logic
 );
 END COMPONENT;
 
@@ -257,10 +261,19 @@ SIGNAL BRANCH_OUTCOME_ID : address;
 
 SIGNAL ADDRESS_MEM : address;
 
+SIGNAL UPDATE_EN, PREDICITON : STD_LOGIC;
+SIGNAL BRANCH_FROM_BTB : address;
+SIGNAL PRED_T_T, PRED_T_NT, PRED_NT_T, PRED_NT_NT : STD_LOGIC;
+
+
 BEGIN
 
 IMEM_ADD <= PC_IF;
 --WR_RF_EN <= CWORD_WRB(0);
+
+BRANCH_ADDRESS <= BRANCH_FROM_BTB WHEN BRANCH_CTRL = '1' ELSE
+		BRANCH_OUTCOME_ID WHEN FLUSH_CTRL = '1' ELSE
+		(OTHERS => '0');
 
 fetch_inst : fetch PORT MAP(	CLK => CLK, RST => RST, FLUSH_CTRL => FLUSH_CTRL,
 								BRANCH_CTRL => BRANCH_CTRL,
@@ -360,18 +373,35 @@ fu_inst : forwarding_unit PORT MAP( RST => RST,
 									BRANCH_FORW => BRANCH_FORW_CTRL,
 									EX_MUL1_SEL => MUX_SEL_OP1, EX_MUL2_SEL => MUX_SEL_OP2
 									);
+	
+btb_inst : BTB PORT MAP(
+		--control signals
+		CLK => CLK, RST => RST,
+		STALL_CTRL => STALL_CTRL
+		UPDATE_EN  => UPDATE_EN,
+		PC_IF => PC_IF,
+		PC_ID => PC_ID,
+		BRANCH_OUTCOME => BRANCH_OUTCOME_ID
+		PRED_T_T => PRED_T_T, PRED_T_NT => PRED_T_NT,
+		PRED_NT_T => PRED_NT_T, PRED_NT_NT => PRED_NT_NT,
+		PREDICTION => PREDICTION,
+		BRANCH_TARGET => BRANCH_FROM_BTB
+);
 
-btb_inst : BTB_control PORT MAP( CLK => CLK, RST => RST,
-								STALL_CTRL => STALL_CTRL,
-								BRANCH_TAKEN => BRANCH_ID,
-								OPERATION_ID => OPERATION_ID,
-								PC_IF => PC_IF, PC_ID => PC_ID,
-								BRANCH_OUTCOME => BRANCH_OUTCOME_ID,
-								FLUSH_CTRL => FLUSH_CTRL,
-								BRANCH_CTRL => BRANCH_CTRL,
-								BRANCH_TARGET => BRANCH_ADDRESS
-								);
-
+btb_control_inst : BTB_control PORT MAP( CLK => CLK, RST => RST,
+						STALL_CTRL => STALL_CTRL,
+						BRANCH_TAKEN => BRANCH_ID,
+						OPERATION_ID => OPERATION_ID,
+						PREDICTION => PREDICTION, ------------------------
+						UPDATE_EN => UPDATE_EN,
+						PRED_T_T => PRED_T_T, PRED_T_NT => PRED_T_NT,
+						PRED_NT_T => PRED_NT_T, PRED_NT_NT => PRED_NT_NT,
+						PC_IF => PC_IF, PC_ID => PC_ID,
+						BRANCH_OUTCOME => BRANCH_OUTCOME_ID,
+						FLUSH_CTRL => FLUSH_CTRL,
+						BRANCH_CTRL => BRANCH_CTRL
+						);
+	
 
 END ARCHITECTURE;
 
