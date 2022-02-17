@@ -10,43 +10,25 @@ PORT(
 		STALL_CTRL : in std_logic;
 		BRANCH_TAKEN : in std_logic;
 		OPERATION_ID : in operation;
+	
+		PREDICTION : IN STD_LOGIC;
+	
+		UPDATE_EN : OUT std_logic;
+		PRED_T_T, PRED_T_NT, PRED_NT_T, PRED_NT_NT : OUT std_logic;
 
 		--inputs
 		PC_IF, PC_ID : in address;
 		BRANCH_OUTCOME : in address;
 		--outputs
 		FLUSH_CTRL : out std_logic;
-		BRANCH_CTRL : out std_logic;
-		BRANCH_TARGET : out address
+		BRANCH_CTRL : out std_logic
 );
 END ENTITY;
 
 ARCHITECTURE behav OF BTB_control IS
 
-COMPONENT BTB IS
-PORT (
-		--control signals
-		CLK, RST : in std_logic;
-		STALL_CTRL : in std_logic;
-		UPDATE_EN  : in std_logic;
-
-		--inputs
-		PC_IF : in address;
-		PC_ID : in address;
-		BRANCH_OUTCOME : in address;
-		PRED_T_T, PRED_T_NT, PRED_NT_T, PRED_NT_NT : in std_logic;
-		
-		--outputs
-		MATCH : out std_logic;
-		BRANCH_TARGET : out address;
-		PREDICTION : out std_logic_vector(1 DOWNTO 0)
-);
-END COMPONENT;
-
-SIGNAL UPDATE_EN, MATCH : std_logic;
-SIGNAL PRED_T_T, PRED_T_NT, PRED_NT_T, PRED_NT_NT : std_logic;
-SIGNAL BRANCH_BTB : address;
-SIGNAL PREDICTION : std_logic_vector(1 DOWNTO 0);
+--SIGNAL BRANCH_BTB : address;
+--SIGNAL PREDICTION : std_logic_vector(1 DOWNTO 0);
 SIGNAL FLUSH, PREDICTED_T : std_logic;
 
 BEGIN
@@ -59,30 +41,23 @@ BEGIN
 			PREDICTED_T <= '0';
 		ELSIF RISING_EDGE(CLK) THEN
 			IF STALL_CTRL = '0' THEN
-				PREDICTED_T <= MATCH AND PREDICTION(1);
+				PREDICTED_T <= PREDICTION;
 			END IF;
 		END IF;
 END PROCESS;
 
 
-btb_inst : BTB PORT MAP( CLK => CLK, RST => RST, STALL_CTRL => STALL_CTRL, UPDATE_EN => UPDATE_EN,
-						PC_IF => PC_IF, PC_ID => PC_ID, BRANCH_OUTCOME => BRANCH_OUTCOME,
-						PRED_T_T => PRED_T_T, PRED_T_NT => PRED_T_NT,
-						PRED_NT_T => PRED_NT_T, PRED_NT_NT => PRED_NT_NT,
-						MATCH => MATCH, BRANCH_TARGET => BRANCH_BTB, PREDICTION => PREDICTION
-						);
-
 branch_proc : PROCESS(RST, OPERATION_ID, MATCH, PREDICTION, BRANCH_BTB, FLUSH)
 BEGIN
 		IF RST = '1' THEN
 			BRANCH_CTRL <= '0';
-			BRANCH_TARGET <= (OTHERS => '0');
-		ELSIF MATCH = '1' AND PREDICTION(1) = '1' THEN
+			--BRANCH_TARGET <= (OTHERS => '0');
+		ELSIF PREDICTION = '1' THEN
 			BRANCH_CTRL <= '1';
-			BRANCH_TARGET <= BRANCH_BTB;
+			--BRANCH_TARGET <= BRANCH_BTB;
 		ELSIF FLUSH = '1' THEN
 			BRANCH_CTRL <= '1';
-			BRANCH_TARGET <= BRANCH_OUTCOME;
+			--BRANCH_TARGET <= BRANCH_OUTCOME;
 		ELSE
 			BRANCH_CTRL <= '0';
 		END IF;
