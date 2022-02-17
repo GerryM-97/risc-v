@@ -188,6 +188,11 @@ PORT(
 		EX_MUL1_SEL, EX_MUL2_SEL : out std_logic_vector(1 downto 0)
 );
 END COMPONENT;
+	
+COMPONENT BTB IS
+PORT(	
+);
+END COMPONENT;
 
 COMPONENT BTB_control IS
 PORT(
