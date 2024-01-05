@@ -1,2 +1,2 @@
 # risc-v
-RISC-V cpu for ISA course
+VHDL code for a 5 stages pipeline RISC-V processor.
